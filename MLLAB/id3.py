@@ -1,75 +1,61 @@
-#9
-# Part A: Import libraries
+# ------------------------------------------------------------
+# QUESTION 9: Decision Tree - Online Retail
+# Expected CSV: OnlineRetail.csv
+# Required columns: CustomerID, InvoiceNo, Quantity, UnitPrice.
+# ------------------------------------------------------------
 import pandas as pd
 import matplotlib.pyplot as plt
-from sklearn.model_selection import train_test_split
 from sklearn.tree import DecisionTreeClassifier, plot_tree
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, classification_report
+from sklearn.model_selection import train_test_split
 
-# Part B: Download and load the dataset
-url = "https://archive.ics.uci.edu/ml/machine-learning-databases/00352/Online%20Retail.xlsx"
-data = pd.read_excel(url)
+df = pd.read_excel("Online Retail.xlsx")
+df = df.dropna(subset=["CustomerID"])
+df = df[~df["InvoiceNo"].astype(str).str.startswith("C")]
+df = df[(df["Quantity"] > 0) & (df["UnitPrice"] > 0)]
 
-# Part C: Clean the data
-data = data.dropna(subset=["CustomerID"])
-data = data[~data["InvoiceNo"].astype(str).str.startswith("C")]
-data = data[(data["Quantity"] > 0) & (data["UnitPrice"] > 0)]
+df["CustomerID"] = df["CustomerID"].astype(int)
+df["Amount"] = df["Quantity"] * df["UnitPrice"]
 
-data["TotalPrice"] = data["Quantity"] * data["UnitPrice"]
-
-# Part D: Create customer features
-customers = data.groupby("CustomerID").agg(
-    TotalSpend=("TotalPrice", "sum"),
-    Purchases=("InvoiceNo", "nunique"),
-    Quantity=("Quantity", "sum"),
-    Products=("StockCode", "nunique")
-).reset_index()
-
-# Create Low, Medium, High spending classes
-customers["Segment"] = pd.qcut(
-    customers["TotalSpend"].rank(method="first"),
-    q=3,
-    labels=[0, 1, 2]
+customer = df.groupby("CustomerID").agg(
+    TotalAmount=("Amount", "sum"),
+    Frequency=("InvoiceNo", "nunique"),
+    AvgQuantity=("Quantity", "mean"),
+    AvgPrice=("Amount", "mean")
 )
 
-# Input features and target
-X = customers[["Purchases", "Quantity", "Products"]]
-y = customers["Segment"].astype(int)
+customer["segment"] = pd.qcut(
+    customer["TotalAmount"].rank(method="first"),
+    q=3, labels=["low", "medium", "high"]
+)
 
-# Part E: Split data and train the tree
-X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.2, random_state=42, stratify=y
+x = customer[["Frequency", "AvgQuantity", "AvgPrice"]]
+y = customer["segment"]
+
+xtrain, xtest, ytrain, ytest = train_test_split(
+    x, y, test_size=0.2, random_state=42
 )
 
 model = DecisionTreeClassifier(
-    criterion="entropy", max_depth=4, random_state=42
+    criterion="entropy", max_depth=3, random_state=42
 )
-model.fit(X_train, y_train)
+model.fit(xtrain, ytrain)
+pred = model.predict(xtest)
 
-# Part F: Evaluate the model
-predictions = model.predict(X_test)
-print("Accuracy:", round(accuracy_score(y_test, predictions), 4))
+print("Accuracy Score:", accuracy_score(ytest, pred))
+print(classification_report(ytest, pred, zero_division=0))
 
-# Part G: Visualize the decision tree
-plt.figure(figsize=(16, 7))
-plot_tree(
-    model,
-    feature_names=X.columns,
-    class_names=["Low", "Medium", "High"],
-    filled=True,
-    rounded=True
-)
+plt.figure(figsize=(24, 12))
+plot_tree(model, feature_names=x.columns,
+          class_names=[str(c) for c in model.classes_],
+          filled=True, rounded=True)
+plt.title("Decision Tree")
+plt.tight_layout()
 plt.show()
 
-# Part H: Feature importance
 importance = pd.Series(
-    model.feature_importances_, index=X.columns
+    model.feature_importances_, index=x.columns
 ).sort_values(ascending=False)
-
-print("\nFeature Importance:")
+print("\nFeature Importances\n")
 print(importance)
 
-importance.plot(kind="bar")
-plt.ylabel("Importance")
-plt.title("Customer Feature Importance")
-plt.show()

@@ -8,8 +8,8 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
 # 1. Load the dataset
-url = "https://archive.ics.uci.edu/ml/machine-learning-databases/wine-quality/winequality-red.csv"
-data = pd.read_csv(url, sep=";")
+
+data = pd.read_csv("archive/WineQT.csv")
 
 # 2. Separate features and target
 X = data.drop("quality", axis=1)
@@ -38,7 +38,7 @@ results = []
 for name, architecture in models.items():
     model = MLPClassifier(
         hidden_layer_sizes=architecture,
-        max_iter=1000,
+        max_iter=2000,
         random_state=42
     )
 
@@ -70,6 +70,6 @@ results_df["Accuracy"].plot(
     ylabel="Accuracy"
 )
 
-plt.xticks(rotation=0)
+
 plt.tight_layout()
 plt.show()

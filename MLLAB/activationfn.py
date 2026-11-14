@@ -1,88 +1,79 @@
+
 #14
 
 import time
 import pandas as pd
 import matplotlib.pyplot as plt
-import tensorflow as tf
+import idx2numpy
 
-from tensorflow.keras.datasets import mnist
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense, Input
+from sklearn.neural_network import MLPClassifier
+from sklearn.metrics import accuracy_score
 
-# 1. Load the MNIST dataset
-(X_train, y_train), (X_test, y_test) = mnist.load_data()
+# 1. Load MNIST dataset
+X_train = idx2numpy.convert_from_file("archive1/train-images.idx3-ubyte")
+y_train = idx2numpy.convert_from_file("archive1/train-labels.idx1-ubyte")
 
-# 2. Normalize and flatten the images
-X_train = X_train.reshape(len(X_train), 784) / 255.0
-X_test = X_test.reshape(len(X_test), 784) / 255.0
+X_test = idx2numpy.convert_from_file("archive1/t10k-images.idx3-ubyte")
+y_test = idx2numpy.convert_from_file("archive1/t10k-labels.idx1-ubyte")
+
+# 2. Preprocess images
+def preprocess(X):
+    X = X.reshape(len(X), 784)
+    X = X / 255.0
+    return X
+
+X_train = preprocess(X_train)
+X_test = preprocess(X_test)
 
 # 3. Define activation functions
-activations = ["sigmoid", "relu", "tanh"]
+activations = ["logistic", "relu", "tanh"]
 
 results = []
-histories = {}
 
 # 4. Train and evaluate each network
-for activation in activations:
-    model = Sequential([
-        Input(shape=(784,)),
-        Dense(128, activation=activation),
-        Dense(64, activation=activation),
-        Dense(10, activation="softmax")
-    ])
+for act in activations:
 
-    model.compile(
-        optimizer="adam",
-        loss="sparse_categorical_crossentropy",
-        metrics=["accuracy"]
+    model = MLPClassifier(
+        hidden_layer_sizes=(100,),
+        activation=act,
+        max_iter=20,
+        random_state=42
     )
 
     start = time.time()
+    model.fit(X_train, y_train)
+    end = time.time()
 
-    history = model.fit(
-        X_train, y_train,
-        epochs=5,
-        batch_size=128,
-        validation_split=0.1,
-        verbose=1
-    )
+    pred = model.predict(X_test)
 
-    training_time = time.time() - start
-
-    test_loss, test_accuracy = model.evaluate(
-        X_test, y_test, verbose=0
-    )
+    accuracy = accuracy_score(y_test, pred)
+    training_time = end - start
 
     results.append({
-        "Activation": activation,
-        "Training Time (seconds)": round(training_time, 2),
-        "Test Accuracy": round(test_accuracy, 4)
+        "Activation": act,
+        "Accuracy": round(accuracy, 4),
+        "Training Time": round(training_time, 2),
+        "Iterations": model.n_iter_
     })
 
-    histories[activation] = history
+    plt.plot(model.loss_curve_, label=act)
 
 # 5. Display comparison
 results_df = pd.DataFrame(results)
 print("\nActivation Function Comparison:")
 print(results_df.to_string(index=False))
 
-# 6. Plot training loss to compare convergence
-for activation in activations:
-    plt.plot(
-        histories[activation].history["loss"],
-        label=activation
-    )
-
-plt.title("Training Loss Comparison")
-plt.xlabel("Epoch")
+# 6. Plot convergence
+plt.xlabel("Iterations")
 plt.ylabel("Training Loss")
+plt.title("Convergence for Different Activation Functions")
 plt.legend()
 plt.show()
 
-# 7. Plot test accuracy comparison
-plt.bar(results_df["Activation"], results_df["Test Accuracy"])
-plt.title("Test Accuracy Comparison")
+# 7. Plot accuracy comparison
+plt.bar(results_df["Activation"], results_df["Accuracy"])
 plt.xlabel("Activation Function")
-plt.ylabel("Test Accuracy")
+plt.ylabel("Accuracy")
+plt.title("Accuracy Comparison")
 plt.ylim(0, 1)
 plt.show()
